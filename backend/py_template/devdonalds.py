@@ -70,7 +70,7 @@ def parse_handwriting(recipeName: str) -> Union[str | None]:
 def create_entry():
 	entry = request.json
 
-	# incorrect num of keys
+	# check that the input is valid
 	if len(entry) != 3:
 		return 'invalid', 400
 
@@ -80,6 +80,7 @@ def create_entry():
 	if entry['name'] in cookbook:
 		return 'non unique entry name', 400
 
+	# if the entry is a recipe, check if its inputs are valid
 	if entry['type'] == 'recipe':
 		if 'requiredItems' not in entry or len(entry['requiredItems']) == 0:
 			return 'no requiredItems', 400
@@ -94,6 +95,7 @@ def create_entry():
 			if i['quantity'] < 0:
 				return 'invalid quantity', 400
 	
+	# if the entry is an ingredient, check if its inputs are valid
 	elif entry['type'] == 'ingredient':
 		if 'cookTime' not in entry:
 			return 'no cookTime', 400
@@ -104,7 +106,7 @@ def create_entry():
 	else:
 		return 'invalid type', 400
 	
-	# delete name from entry and add entry to cookbook
+	# add entry to cookbook in the form { name: {...} }
 	cookbook[entry.pop('name')] = entry
 	
 	return '', 200
@@ -119,10 +121,12 @@ def summary():
 	if name not in cookbook or cookbook[name]['type'] != 'recipe':
 		return 'invalid name', 400
 
+	# add all ingredients and cookTime to ingredient_dict recursively
 	ingredient_dict = {'cookTime': 0, 'ingredients': {}}
 	if handle_recipe(name, ingredient_dict) == False:
 		return 'couldnt handle recipe', 400
 
+	# using ingredient_dict, format the result correctly as required
 	result = {'name': name, 'cookTime': ingredient_dict['cookTime'], 'ingredients': []}
 	for ingrName, quantity in ingredient_dict['ingredients'].items():
 		result['ingredients'].append({'name': ingrName, 'quantity': quantity})
@@ -130,15 +134,19 @@ def summary():
 	return result, 200
 
 def handle_recipe(name, ingredient_dict):
+	# loopo thru each item in the recipe
 	for i in cookbook[name]['requiredItems']:
 		item_name = i['name']
 
+		# check if the item exists in the cookbook
 		if item_name not in cookbook:
 			return False
 		
+		# if the item is another recipe, recursively handle it
 		if cookbook[item_name] == 'recipe':
 			return handle_recipe(item_name, ingredient_dict)
 		
+		# add the ingredient and its cookTime to the dict, with correct quantity
 		else:
 			ingredient_dict['ingredients'][item_name] = ingredient_dict['ingredients'].get(item_name, 0) + i['quantity']
 			ingredient_dict['cookTime'] += cookbook[item_name]['cookTime'] * i['quantity']
